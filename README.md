@@ -1,2 +1,2 @@
-# crawler-service
+# crawler
 Go process used to crawl websites
