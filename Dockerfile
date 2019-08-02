@@ -14,5 +14,6 @@ RUN go get -d ./... && \
 # runtime image
 FROM alpine:latest
 COPY --from=builder /app/crawler /app/
+COPY .env /app/
 WORKDIR /app/
 CMD ["./crawler"]
