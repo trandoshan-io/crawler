@@ -25,6 +25,11 @@ var (
 	urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+")
 )
 
+type websiteData struct {
+	url  string
+	data []byte
+}
+
 func main() {
 	log.Println("Initializing crawler")
 
@@ -58,11 +63,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Unable to create consumer: ", err.Error())
 	}
-	log.Println("Consumer initialized successfully")
-
 	if err := consumer.Consume(todoQueue, true, handleMessages(publisher)); err != nil {
 		log.Fatal("Unable to consume message: ", err.Error())
 	}
+	log.Println("Consumer initialized successfully")
 
 	//TODO: better way
 	select {}
@@ -86,7 +90,7 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
 				log.Println("Error while processing message: ", err.Error())
 			}
 			// Put website body in content queue
-			if err := publisher.PublishJson("", contentQueue, data); err != nil {
+			if err := publisher.PublishJson("", contentQueue, websiteData{url: url, data: data,}); err != nil {
 				log.Println("Error while trying to publish to content queue: ", err.Error())
 			}
 			// Put all found URLs into done queue
@@ -106,11 +110,14 @@ func crawlPage(url string) ([]byte, []string, error) {
 
 	resp := fasthttp.AcquireResponse()
 	// disable SSL check because certificate may not be available inside container
-	client := &fasthttp.Client{TLSConfig: &tls.Config{InsecureSkipVerify: true}}
+	//TODO: create at startup ?
+	client := &fasthttp.Client{Name: "Trandoshan/Crawler", TLSConfig: &tls.Config{InsecureSkipVerify: true}}
 
 	if err := client.Do(req, resp); err != nil {
 		return nil, nil, err
 	}
+
+	// todo do not load if content type is octet stream or something
 
 	switch statusCode := resp.StatusCode(); {
 	case statusCode > 301:
