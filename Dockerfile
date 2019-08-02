@@ -16,4 +16,3 @@ FROM alpine:latest
 COPY --from=builder /app/crawler /app/
 WORKDIR /app/
 CMD ["./crawler"]
-EXPOSE 7777
