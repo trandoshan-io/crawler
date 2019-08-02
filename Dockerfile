@@ -7,8 +7,8 @@ RUN apk update && apk upgrade && \
 COPY . /app/
 WORKDIR /app
 
-RUN go get -d ./... && \
-    go build crawler.go
+RUN go get -v -d ./...
+RUN go build -v crawler.go
 
 
 # runtime image

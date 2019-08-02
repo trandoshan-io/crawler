@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -73,29 +74,32 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
 	return func(deliveries <-chan amqp.Delivery, done chan error) {
 		for delivery := range deliveries {
 			var url string
-			if err := json.Unmarshal(delivery.Body, url); err == nil {
+			if err := json.Unmarshal(delivery.Body, &url); err == nil {
 				data, urls, err := crawlPage(url)
 				if err != nil {
 					log.Println("Error while processing message: ", err.Error())
 				}
-
 				if err := publisher.PublishJson("", doneQueue, urls); err != nil {
 					log.Println("Error while trying to publish to done queue: ", err.Error())
 				}
 				if err := publisher.PublishJson("", contentQueue, data); err != nil {
 					log.Println("Error while trying to publish to content queue: ", err.Error())
 				}
+			} else {
+				log.Println("Error while deserializing payload: ", err.Error())
 			}
 		}
 	}
 }
 
 func crawlPage(url string) ([]byte, []string, error) {
+	log.Println("Crawling page: ", url)
 	req := fasthttp.AcquireRequest()
 	req.SetRequestURI(url)
 
 	resp := fasthttp.AcquireResponse()
-	client := &fasthttp.Client{}
+	// disable SSL check because certificate may not be available inside container
+	client := &fasthttp.Client{TLSConfig: &tls.Config{InsecureSkipVerify: true}}
 
 	if err := client.Do(req, resp); err != nil {
 		return nil, nil, err
