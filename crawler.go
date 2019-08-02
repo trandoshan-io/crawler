@@ -74,19 +74,26 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
 	return func(deliveries <-chan amqp.Delivery, done chan error) {
 		for delivery := range deliveries {
 			var url string
-			if err := json.Unmarshal(delivery.Body, &url); err == nil {
-				data, urls, err := crawlPage(url)
-				if err != nil {
-					log.Println("Error while processing message: ", err.Error())
-				}
-				if err := publisher.PublishJson("", doneQueue, urls); err != nil {
+
+			// Unmarshal message
+			if err := json.Unmarshal(delivery.Body, &url); err != nil {
+				log.Println("Error while de-serializing payload: ", err.Error())
+				break
+			}
+
+			data, urls, err := crawlPage(url)
+			if err != nil {
+				log.Println("Error while processing message: ", err.Error())
+			}
+			// Put website body in content queue
+			if err := publisher.PublishJson("", contentQueue, data); err != nil {
+				log.Println("Error while trying to publish to content queue: ", err.Error())
+			}
+			// Put all found URLs into done queue
+			for _, url := range urls {
+				if err := publisher.PublishJson("", doneQueue, url); err != nil {
 					log.Println("Error while trying to publish to done queue: ", err.Error())
 				}
-				if err := publisher.PublishJson("", contentQueue, data); err != nil {
-					log.Println("Error while trying to publish to content queue: ", err.Error())
-				}
-			} else {
-				log.Println("Error while deserializing payload: ", err.Error())
 			}
 		}
 	}
