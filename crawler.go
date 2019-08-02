@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 const (
@@ -31,6 +32,13 @@ func main() {
 		log.Fatal("Unable to load .env file: ", err.Error())
 	}
 	log.Println("Loaded .env file")
+
+	// allow some kind of boot delay to fix usage in docker-compose
+	// TODO: find a better way
+	if startupDelay := os.Getenv("STARTUP_DELAY"); startupDelay != "" {
+		val, _ := strconv.Atoi(startupDelay)
+		time.Sleep(time.Duration(val) * time.Second)
+	}
 
 	prefetch, err := strconv.Atoi(os.Getenv("AMQP_PREFETCH"))
 	if err != nil {
@@ -54,6 +62,11 @@ func main() {
 	if err := consumer.Consume(todoQueue, true, handleMessages(publisher)); err != nil {
 		log.Fatal("Unable to consume message: ", err.Error())
 	}
+
+	//TODO: better way
+	select {}
+
+	_ = consumer.Shutdown()
 }
 
 func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Delivery, done chan error) {
@@ -63,7 +76,7 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
 			if err := json.Unmarshal(delivery.Body, url); err == nil {
 				data, urls, err := crawlPage(url)
 				if err != nil {
-
+					log.Println("Error while processing message: ", err.Error())
 				}
 
 				if err := publisher.PublishJson("", doneQueue, urls); err != nil {
