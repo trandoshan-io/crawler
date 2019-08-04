@@ -1,18 +1,17 @@
 package main
 
 import (
-	"crypto/tls"
-	"encoding/json"
-	"fmt"
-	"github.com/joho/godotenv"
-	"github.com/streadway/amqp"
-	tamqp "github.com/trandoshan-io/amqp"
-	"github.com/valyala/fasthttp"
-	"log"
-	"os"
-	"regexp"
-	"strconv"
-	"time"
+   "crypto/tls"
+   "encoding/json"
+   "fmt"
+   "github.com/joho/godotenv"
+   "github.com/streadway/amqp"
+   tamqp "github.com/trandoshan-io/amqp"
+   "github.com/valyala/fasthttp"
+   "log"
+   "os"
+   "regexp"
+   "strconv"
 )
 
 const (
@@ -38,13 +37,6 @@ func main() {
 		log.Fatal("Unable to load .env file: ", err.Error())
 	}
 	log.Println("Loaded .env file")
-
-	// allow some kind of boot delay to fix usage in docker-compose
-	// TODO: find a better way
-	if startupDelay := os.Getenv("STARTUP_DELAY"); startupDelay != "" {
-		val, _ := strconv.Atoi(startupDelay)
-		time.Sleep(time.Duration(val) * time.Second)
-	}
 
 	prefetch, err := strconv.Atoi(os.Getenv("AMQP_PREFETCH"))
 	if err != nil {
