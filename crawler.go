@@ -74,7 +74,7 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
          // Unmarshal message
          if err := json.Unmarshal(delivery.Body, &url); err != nil {
             log.Println("Error while de-serializing payload: ", err.Error())
-            break
+            continue
          }
 
          data, urls, err := crawlPage(url)
