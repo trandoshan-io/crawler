@@ -55,7 +55,7 @@ func main() {
    if err != nil {
       log.Fatal("Unable to create consumer: ", err.Error())
    }
-   if err := consumer.Consume(todoQueue, true, handleMessages(publisher)); err != nil {
+   if err := consumer.Consume(todoQueue, false, handleMessages(publisher)); err != nil {
       log.Fatal("Unable to consume message: ", err.Error())
    }
    log.Println("Consumer initialized successfully")
@@ -74,16 +74,21 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
          // Unmarshal message
          if err := json.Unmarshal(delivery.Body, &url); err != nil {
             log.Println("Error while de-serializing payload: ", err.Error())
+            _ = delivery.Reject(false)
             continue
          }
 
          data, urls, err := crawlPage(url)
          if err != nil {
             log.Println("Error while processing message: ", err.Error())
+            _ = delivery.Reject(false)
+            continue
          }
          // Put website body in content queue
          if err := publisher.PublishJson("", contentQueue, WebsiteData{Url: url, Data: data,}); err != nil {
             log.Println("Error while trying to publish to content queue: ", err.Error())
+            _ = delivery.Reject(false)
+            continue
          }
          // Put all found URLs into done queue
          for _, url := range urls {
@@ -91,6 +96,8 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
                log.Println("Error while trying to publish to done queue: ", err.Error())
             }
          }
+
+         _ = delivery.Ack(false)
       }
    }
 }
