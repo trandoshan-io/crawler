@@ -38,6 +38,12 @@ func main() {
    }
    log.Println("Loaded .env file")
 
+   // build list of forbidden content-type
+   //TODO: plug this to a queue? redis cache?
+   var forbiddenContentTypes = []string{
+      "application/octet-stream",
+   }
+
    prefetch, err := strconv.Atoi(os.Getenv("AMQP_PREFETCH"))
    if err != nil {
       log.Fatal(err)
@@ -55,7 +61,7 @@ func main() {
    if err != nil {
       log.Fatal("Unable to create consumer: ", err.Error())
    }
-   if err := consumer.Consume(todoQueue, false, handleMessages(publisher)); err != nil {
+   if err := consumer.Consume(todoQueue, false, handleMessages(publisher, forbiddenContentTypes)); err != nil {
       log.Fatal("Unable to consume message: ", err.Error())
    }
    log.Println("Consumer initialized successfully")
@@ -66,7 +72,7 @@ func main() {
    _ = consumer.Shutdown()
 }
 
-func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Delivery, done chan error) {
+func handleMessages(publisher tamqp.Publisher, forbiddenContentTypes []string) func(deliveries <-chan amqp.Delivery, done chan error) {
    return func(deliveries <-chan amqp.Delivery, done chan error) {
       for delivery := range deliveries {
          var url string
@@ -78,7 +84,7 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
             continue
          }
 
-         data, urls, err := crawlPage(url)
+         data, urls, err := crawlPage(url, forbiddenContentTypes)
          if err != nil {
             log.Println("Error while processing message: ", err.Error())
             _ = delivery.Reject(false)
@@ -102,7 +108,7 @@ func handleMessages(publisher tamqp.Publisher) func(deliveries <-chan amqp.Deliv
    }
 }
 
-func crawlPage(url string) (string, []string, error) {
+func crawlPage(url string, forbiddenContentTypes []string) (string, []string, error) {
    log.Println("Crawling page: ", url)
    req := fasthttp.AcquireRequest()
    req.SetRequestURI(url)
@@ -116,13 +122,19 @@ func crawlPage(url string) (string, []string, error) {
       return "", nil, err
    }
 
-   // todo do not load if content type is octet stream or something
+   // make sure response has no forbidden content type
+   contentType := string(resp.Header.ContentType())
+   for _, forbiddenContentType := range forbiddenContentTypes {
+      if contentType == forbiddenContentType {
+         return "", nil, fmt.Errorf("forbidden content-type: %v", contentType)
+      }
+   }
 
    switch statusCode := resp.StatusCode(); {
    case statusCode > 301:
       return "", nil, fmt.Errorf("Invalid status code: " + string(statusCode))
    case statusCode == 301:
-      return crawlPage(string(resp.Header.Peek("Location")))
+      return crawlPage(string(resp.Header.Peek("Location")), forbiddenContentTypes)
    default:
       return string(resp.Body()), extractUrls(resp.Body()), nil
    }
