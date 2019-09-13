@@ -8,10 +8,12 @@ import (
    "github.com/streadway/amqp"
    tamqp "github.com/trandoshan-io/amqp"
    "github.com/valyala/fasthttp"
+   "github.com/valyala/fasthttp/fasthttpproxy"
    "log"
    "os"
    "regexp"
    "strconv"
+   "time"
 )
 
 const (
@@ -116,7 +118,13 @@ func crawlPage(url string, forbiddenContentTypes []string) (string, []string, er
    resp := fasthttp.AcquireResponse()
    // disable SSL check because certificate may not be available inside container
    //TODO: create at startup ?
-   client := &fasthttp.Client{Name: "Trandoshan/Crawler", TLSConfig: &tls.Config{InsecureSkipVerify: true}}
+   client := &fasthttp.Client{
+      Name:         "Trandoshan/Crawler",
+      Dial:         fasthttpproxy.FasthttpSocksDialer(os.Getenv("TOR_PROXY")),
+      ReadTimeout:  time.Second * 5,
+      WriteTimeout: time.Second * 5,
+      TLSConfig:    &tls.Config{InsecureSkipVerify: true},
+   }
 
    if err := client.Do(req, resp); err != nil {
       return "", nil, err

@@ -7,7 +7,8 @@ RUN apk update && apk upgrade && \
 RUN go get -v github.com/joho/godotenv && \
     go get -v github.com/streadway/amqp && \
     go get -v github.com/trandoshan-io/amqp && \
-    go get -v github.com/valyala/fasthttp
+    go get -v github.com/valyala/fasthttp && \
+    go get -v golang.org/x/net/proxy
 
 COPY . /app/
 WORKDIR /app
