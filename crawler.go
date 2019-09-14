@@ -28,7 +28,7 @@ var (
 
 type WebsiteData struct {
    Url  string `json:"url"`
-   Data string `json:"data"`
+   Content string `json:"content"`
 }
 
 func main() {
@@ -93,7 +93,7 @@ func handleMessages(publisher tamqp.Publisher, forbiddenContentTypes []string) f
             continue
          }
          // Put website body in content queue
-         if err := publisher.PublishJson("", contentQueue, WebsiteData{Url: url, Data: data,}); err != nil {
+         if err := publisher.PublishJson("", contentQueue, WebsiteData{Url: url, Content: data,}); err != nil {
             log.Println("Error while trying to publish to content queue: ", err.Error())
             _ = delivery.Reject(false)
             continue
