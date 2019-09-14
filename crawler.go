@@ -26,7 +26,7 @@ var (
    urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+")
 )
 
-type WebsiteData struct {
+type PageData struct {
    Url  string `json:"url"`
    Content string `json:"content"`
 }
@@ -92,8 +92,8 @@ func handleMessages(publisher tamqp.Publisher, forbiddenContentTypes []string) f
             _ = delivery.Reject(false)
             continue
          }
-         // Put website body in content queue
-         if err := publisher.PublishJson("", contentQueue, WebsiteData{Url: url, Content: data,}); err != nil {
+         // Put page body in content queue
+         if err := publisher.PublishJson("", contentQueue, PageData{Url: url, Content: data,}); err != nil {
             log.Println("Error while trying to publish to content queue: ", err.Error())
             _ = delivery.Reject(false)
             continue
