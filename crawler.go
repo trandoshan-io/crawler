@@ -41,7 +41,7 @@ func main() {
    log.Println("Loaded .env file")
 
    // build list of forbidden content-type
-   //TODO: plug this to a queue? redis cache?
+   //TODO: plug this to database
    var forbiddenContentTypes = []string{
       "application/octet-stream",
    }
@@ -119,7 +119,7 @@ func crawlPage(url string, forbiddenContentTypes []string) (string, []string, er
    // disable SSL check because certificate may not be available inside container
    //TODO: create at startup ?
    client := &fasthttp.Client{
-      Name:         "Trandoshan/Crawler",
+      Name:         "trandoshan-io/crawler",
       Dial:         fasthttpproxy.FasthttpSocksDialer(os.Getenv("TOR_PROXY")),
       ReadTimeout:  time.Second * 5,
       WriteTimeout: time.Second * 5,
