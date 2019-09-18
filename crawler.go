@@ -31,6 +31,7 @@ type PageData struct {
    Content string `json:"content"`
 }
 
+//TODO : spawn multiple goroutine to crawl in multiple thread?
 func main() {
    log.Println("Initializing crawler")
 
@@ -46,6 +47,16 @@ func main() {
       "application/octet-stream",
    }
 
+   // create HTTP client with optimized configuration
+   // disable SSL check because certificate may not be available inside container
+   httpClient := &fasthttp.Client{
+      Name:         "trandoshan-io/crawler",
+      Dial:         fasthttpproxy.FasthttpSocksDialer(os.Getenv("TOR_PROXY")),
+      ReadTimeout:  time.Second * 5,
+      WriteTimeout: time.Second * 5,
+      TLSConfig:    &tls.Config{InsecureSkipVerify: true},
+   }
+
    // connect to NATS server
    nc, err := nats.Connect(os.Getenv("NATS_URI"))
    if err != nil {
@@ -54,7 +65,7 @@ func main() {
    defer nc.Close()
 
    // initialize queue subscriber
-   if _, err := nc.QueueSubscribe(todoSubject, crawlingQueue, handleMessages(nc, forbiddenContentTypes)); err != nil {
+   if _, err := nc.QueueSubscribe(todoSubject, crawlingQueue, handleMessages(nc, httpClient, forbiddenContentTypes)); err != nil {
       log.Fatal("Error while trying to subscribe to server: ", err)
    }
 
@@ -64,7 +75,7 @@ func main() {
    select {}
 }
 
-func handleMessages(nc *nats.Conn, forbiddenContentTypes []string) func(*nats.Msg) {
+func handleMessages(nc *nats.Conn, hc *fasthttp.Client, forbiddenContentTypes []string) func(*nats.Msg) {
    return func(m *nats.Msg) {
       var url string
 
@@ -76,7 +87,7 @@ func handleMessages(nc *nats.Conn, forbiddenContentTypes []string) func(*nats.Ms
       }
 
       // Crawl the page
-      data, urls, err := crawlPage(url, forbiddenContentTypes)
+      data, urls, err := crawlPage(url, hc, forbiddenContentTypes)
       if err != nil {
          log.Println("Error while processing message: ", err)
          // todo: store in sort of DLQ?
@@ -110,23 +121,17 @@ func handleMessages(nc *nats.Conn, forbiddenContentTypes []string) func(*nats.Ms
    }
 }
 
-func crawlPage(url string, forbiddenContentTypes []string) (string, []string, error) {
+func crawlPage(url string, hc *fasthttp.Client, forbiddenContentTypes []string) (string, []string, error) {
    log.Println("Crawling page: ", url)
+
    req := fasthttp.AcquireRequest()
+   resp := fasthttp.AcquireResponse()
+   defer fasthttp.ReleaseRequest(req)
+   defer fasthttp.ReleaseResponse(resp)
+
    req.SetRequestURI(url)
 
-   resp := fasthttp.AcquireResponse()
-   // disable SSL check because certificate may not be available inside container
-   //TODO: create at startup ?
-   client := &fasthttp.Client{
-      Name:         "trandoshan-io/crawler",
-      Dial:         fasthttpproxy.FasthttpSocksDialer(os.Getenv("TOR_PROXY")),
-      ReadTimeout:  time.Second * 5,
-      WriteTimeout: time.Second * 5,
-      TLSConfig:    &tls.Config{InsecureSkipVerify: true},
-   }
-
-   if err := client.Do(req, resp); err != nil {
+   if err := hc.Do(req, resp); err != nil {
       return "", nil, err
    }
 
