@@ -5,8 +5,7 @@ import (
    "encoding/json"
    "fmt"
    "github.com/joho/godotenv"
-   "github.com/streadway/amqp"
-   tamqp "github.com/trandoshan-io/amqp"
+   "github.com/nats-io/nats.go"
    "github.com/valyala/fasthttp"
    "github.com/valyala/fasthttp/fasthttpproxy"
    "log"
@@ -17,9 +16,10 @@ import (
 )
 
 const (
-   todoQueue    = "todo"
-   doneQueue    = "done"
-   contentQueue = "content"
+   crawlingQueue    = "crawlingQueue"
+   todoSubject = "todoSubject"
+   doneSubject = "doneSubject"
+   contentSubject = "contentSubject"
 )
 
 var (
@@ -46,66 +46,66 @@ func main() {
       "application/octet-stream",
    }
 
-   prefetch, err := strconv.Atoi(os.Getenv("AMQP_PREFETCH"))
+   // connect to NATS server
+   nc, err := nats.Connect(os.Getenv("NATS_URI"))
    if err != nil {
-      log.Fatal(err)
+      log.Fatal("Error while connecting to nats server: ", err)
+   }
+   defer nc.Close()
+
+   // initialize queue subscriber
+   if _, err := nc.QueueSubscribe(todoSubject, crawlingQueue, handleMessages(nc, forbiddenContentTypes)); err != nil {
+      log.Fatal("Error while trying to subscribe to server: ", err)
    }
 
-   // initialize publishers
-   publisher, err := tamqp.NewStateFullPublisher(os.Getenv("AMQP_URI"))
-   if err != nil {
-      log.Fatal("Unable  to create publisher: ", err.Error())
-   }
-   log.Println("Publisher initialized successfully")
-
-   // initialize consumer & start him
-   consumer, err := tamqp.NewConsumer(os.Getenv("AMQP_URI"), prefetch)
-   if err != nil {
-      log.Fatal("Unable to create consumer: ", err.Error())
-   }
-   if err := consumer.Consume(todoQueue, false, handleMessages(publisher, forbiddenContentTypes)); err != nil {
-      log.Fatal("Unable to consume message: ", err.Error())
-   }
    log.Println("Consumer initialized successfully")
 
    //TODO: better way
    select {}
-
-   _ = consumer.Shutdown()
 }
 
-func handleMessages(publisher tamqp.Publisher, forbiddenContentTypes []string) func(deliveries <-chan amqp.Delivery, done chan error) {
-   return func(deliveries <-chan amqp.Delivery, done chan error) {
-      for delivery := range deliveries {
-         var url string
+func handleMessages(nc *nats.Conn, forbiddenContentTypes []string) func(*nats.Msg) {
+   return func(m *nats.Msg) {
+      var url string
 
-         // Unmarshal message
-         if err := json.Unmarshal(delivery.Body, &url); err != nil {
-            log.Println("Error while de-serializing payload: ", err.Error())
-            _ = delivery.Reject(false)
-            continue
-         }
+      // Unmarshal message
+      if err := json.Unmarshal(m.Data, &url); err != nil {
+         log.Println("Error while de-serializing payload: ", err)
+         // todo: store in sort of DLQ?
+         return
+      }
 
-         data, urls, err := crawlPage(url, forbiddenContentTypes)
+      // Crawl the page
+      data, urls, err := crawlPage(url, forbiddenContentTypes)
+      if err != nil {
+         log.Println("Error while processing message: ", err)
+         // todo: store in sort of DLQ?
+         return
+      }
+
+      // Put page body in content queue
+      bytes, err := json.Marshal(PageData{Url: url, Content: data,})
+      if err != nil {
+         log.Println("Error while serializing message into json: ", err)
+         // todo: store in sort of DLQ?
+         return
+      }
+      if err = nc.Publish(contentSubject, bytes); err != nil {
+         log.Println("Error while trying to publish to content queue: ", err)
+         // todo: store in sort of DLQ?
+         return
+      }
+
+      // Put all found URLs into done queue
+      for _, url := range urls {
+         bytes, err := json.Marshal(url)
          if err != nil {
-            log.Println("Error while processing message: ", err.Error())
-            _ = delivery.Reject(false)
+            log.Println("Error while serializing message into json: ", err)
             continue
          }
-         // Put page body in content queue
-         if err := publisher.PublishJson("", contentQueue, PageData{Url: url, Content: data,}); err != nil {
-            log.Println("Error while trying to publish to content queue: ", err.Error())
-            _ = delivery.Reject(false)
-            continue
+         if err = nc.Publish(doneSubject, bytes); err != nil {
+            log.Println("Error while trying to publish to done queue: ", err.Error())
          }
-         // Put all found URLs into done queue
-         for _, url := range urls {
-            if err := publisher.PublishJson("", doneQueue, url); err != nil {
-               log.Println("Error while trying to publish to done queue: ", err.Error())
-            }
-         }
-
-         _ = delivery.Ack(false)
       }
    }
 }
@@ -141,7 +141,10 @@ func crawlPage(url string, forbiddenContentTypes []string) (string, []string, er
    switch statusCode := resp.StatusCode(); {
    case statusCode > 301:
       return "", nil, fmt.Errorf("Invalid status code: " + string(statusCode))
-   case statusCode == 301:
+   case statusCode == 301 || statusCode == 302:
+      //todo: do not follow redirect but put in done queue instead
+      //todo: or simply return url in array?
+      log.Println("Following redirect (" + strconv.Itoa(statusCode) + ")")
       return crawlPage(string(resp.Header.Peek("Location")), forbiddenContentTypes)
    default:
       return string(resp.Body()), extractUrls(resp.Body()), nil
