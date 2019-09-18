@@ -141,11 +141,17 @@ func crawlPage(url string, forbiddenContentTypes []string) (string, []string, er
    switch statusCode := resp.StatusCode(); {
    case statusCode > 301:
       return "", nil, fmt.Errorf("Invalid status code: " + string(statusCode))
+   // in case of redirect return found url in header and do not automatically crawl
+   // since the url may have been crawled already
    case statusCode == 301 || statusCode == 302:
-      //todo: do not follow redirect but put in done queue instead
-      //todo: or simply return url in array?
-      log.Println("Following redirect (" + strconv.Itoa(statusCode) + ")")
-      return crawlPage(string(resp.Header.Peek("Location")), forbiddenContentTypes)
+      log.Println("Found redirect (HTTP " + strconv.Itoa(statusCode) + ")")
+      // extract url that may be present in the page
+      urls := extractUrls(resp.Body())
+      // add url present in the location header (if any)
+      if locationUrl := string(resp.Header.Peek("Location")); locationUrl != "" {
+         urls = append(urls, locationUrl)
+      }
+      return string(resp.Body()), urls, nil
    default:
       return string(resp.Body()), extractUrls(resp.Body()), nil
    }
