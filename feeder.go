@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/joho/godotenv"
 	"github.com/nats-io/nats.go"
 	"log"
 	"os"
@@ -13,12 +12,6 @@ func main() {
 	if len(os.Args) < 2 {
 		log.Fatal("Correct usage: ./feeder <url>")
 	}
-
-	// load .env
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Unable to load .env file: ", err.Error())
-	}
-	log.Println("Loaded .env file")
 
 	// connect to NATS server
 	nc, err := nats.Connect(os.Getenv("NATS_URI"))

@@ -4,7 +4,6 @@ import (
    "crypto/tls"
    "encoding/json"
    "fmt"
-   "github.com/joho/godotenv"
    "github.com/nats-io/nats.go"
    "github.com/valyala/fasthttp"
    "github.com/valyala/fasthttp/fasthttpproxy"
@@ -34,12 +33,6 @@ type PageData struct {
 //TODO : spawn multiple goroutine to crawl in multiple thread?
 func main() {
    log.Println("Initializing crawler")
-
-   // load .env
-   if err := godotenv.Load(); err != nil {
-      log.Fatal("Unable to load .env file: ", err.Error())
-   }
-   log.Println("Loaded .env file")
 
    // build list of forbidden content-type
    //TODO: plug this to database
