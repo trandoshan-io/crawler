@@ -137,7 +137,7 @@ func crawlPage(url string, hc *fasthttp.Client, forbiddenContentTypes []string) 
    }
 
    switch statusCode := resp.StatusCode(); {
-   case statusCode > 301:
+   case statusCode > 302:
       return "", nil, fmt.Errorf("Invalid status code: " + string(statusCode))
    // in case of redirect return found url in header and do not automatically crawl
    // since the url may have been crawled already
