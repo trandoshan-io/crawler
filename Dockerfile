@@ -12,13 +12,11 @@ COPY . /app/
 WORKDIR /app
 
 RUN go build -v crawler.go
-RUN go build -v feeder.go
 
 
 # runtime image
 FROM alpine:latest
 COPY --from=builder /app/crawler /app/
-COPY --from=builder /app/feeder /app/
 
 WORKDIR /app/
 CMD ["./crawler"]
