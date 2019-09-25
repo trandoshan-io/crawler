@@ -11,6 +11,8 @@ RUN go get -v github.com/nats-io/nats.go/ && \
 COPY . /app/
 WORKDIR /app
 
+# Test then build app
+RUN CGO_ENABLED=0 go test -v
 RUN go build -v crawler.go
 
 
