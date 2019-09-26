@@ -11,22 +11,24 @@ import (
    "os"
    "regexp"
    "strconv"
+   "strings"
    "time"
 )
 
 const (
-   crawlingQueue    = "crawlingQueue"
-   todoSubject = "todoSubject"
-   doneSubject = "doneSubject"
+   crawlingQueue  = "crawlingQueue"
+   todoSubject    = "todoSubject"
+   doneSubject    = "doneSubject"
    contentSubject = "contentSubject"
 )
 
 var (
-   urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+.onion?[a-zA-Z0-9-_./]+")
+   absoluteUrlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+.onion?[a-zA-Z0-9-_./]+")
+   relativeUrlRegex = regexp.MustCompile("href=\"?[a-zA-Z0-9-_./]+\"")
 )
 
 type PageData struct {
-   Url  string `json:"url"`
+   Url     string `json:"url"`
    Content string `json:"content"`
 }
 
@@ -138,30 +140,42 @@ func crawlPage(url string, hc *fasthttp.Client, forbiddenContentTypes []string) 
    switch statusCode := resp.StatusCode(); {
    case statusCode > 302:
       return "", nil, fmt.Errorf("Invalid status code: " + string(statusCode))
-   // in case of redirect return found url in header and do not automatically crawl
-   // since the url may have been crawled already
+      // in case of redirect return found url in header and do not automatically crawl
+      // since the url may have been crawled already
    case statusCode == 301 || statusCode == 302:
       log.Println("Found redirect (HTTP " + strconv.Itoa(statusCode) + ")")
       // extract url that may be present in the page
-      urls := extractUrls(resp.Body())
+      urls := extractUrls(strings.TrimSuffix(url, "/"), resp.Body())
       // add url present in the location header (if any)
       if locationUrl := string(resp.Header.Peek("Location")); locationUrl != "" {
          urls = append(urls, locationUrl)
       }
       return string(resp.Body()), urls, nil
    default:
-      return string(resp.Body()), extractUrls(resp.Body()), nil
+      return string(resp.Body()), extractUrls(strings.TrimSuffix(url, "/"), resp.Body()), nil
    }
 }
 
-func extractUrls(content []byte) []string {
-   // Compile regex to extract all urls in the page body
-   urls := urlRegex.FindAll(content, -1)
+func extractUrls(websiteUrl string, content []byte) []string {
+   // Compile regex to extract all absolute urls in the page body
+   absoluteUrls := absoluteUrlRegex.FindAll(content, -1)
+   // Compile regex to extract all relative urls in the page body
+   relativeUrls := relativeUrlRegex.FindAll(content, -1)
 
    // Convert each bytes element into their string representation
    var urlStrings []string
-   for _, element := range urls {
+   for _, element := range absoluteUrls {
       urlStrings = append(urlStrings, string(element))
+   }
+   for _, element := range relativeUrls {
+      // Little magic here !
+      // First of all since the regex is taking the href="..." we need to remote both href=" and the last "
+      url := strings.TrimSuffix(strings.ReplaceAll(string(element), "href=\"", ""), "\"")
+      // Then remove any leading '/'
+      url = strings.TrimPrefix(url, "/")
+      // Then preprend website url to the found relative url to have the absolute one
+      url = websiteUrl + "/" + url
+      urlStrings = append(urlStrings, url)
    }
    return urlStrings
 }
