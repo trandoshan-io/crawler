@@ -22,7 +22,7 @@ const (
 )
 
 var (
-   urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+.onion[a-zA-Z0-9-_./]+")
+   urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+.onion?[a-zA-Z0-9-_./]+")
 )
 
 type PageData struct {
