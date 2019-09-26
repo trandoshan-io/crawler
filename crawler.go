@@ -22,7 +22,7 @@ const (
 )
 
 var (
-   urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+")
+   urlRegex = regexp.MustCompile("https?://[a-zA-Z0-9-_./]+.onion[a-zA-Z0-9-_./]+")
 )
 
 type PageData struct {
@@ -30,7 +30,6 @@ type PageData struct {
    Content string `json:"content"`
 }
 
-//TODO : spawn multiple goroutine to crawl in multiple thread?
 func main() {
    log.Println("Initializing crawler")
 
