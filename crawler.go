@@ -35,11 +35,9 @@ type PageData struct {
 func main() {
    log.Println("Initializing crawler")
 
-   // build list of forbidden content-type
-   //TODO: plug this to database
-   var forbiddenContentTypes = []string{
-      "application/octet-stream",
-   }
+   // build list of forbidden content-type from system property
+   var forbiddenContentTypes = strings.Split(os.Getenv("FORBIDDEN_CONTENT_TYPES"), ";")
+   log.Println("Loaded " + strconv.Itoa(len(forbiddenContentTypes)) + " forbidden content types")
 
    // create HTTP client with optimized configuration
    // disable SSL check because certificate may not be available inside container
