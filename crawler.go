@@ -16,10 +16,11 @@ import (
 )
 
 const (
-   crawlingQueue  = "crawlingQueue"
-   todoSubject    = "todoSubject"
-   doneSubject    = "doneSubject"
-   contentSubject = "contentSubject"
+   crawlingQueue    = "crawlingQueue"
+   todoSubject      = "todoSubject"
+   doneSubject      = "doneSubject"
+   contentSubject   = "contentSubject"
+   defaultUserAgent = "trandoshan-io/crawler"
 )
 
 var (
@@ -35,14 +36,22 @@ type PageData struct {
 func main() {
    log.Println("Initializing crawler")
 
-   // build list of forbidden content-type from system property
+   // build list of forbidden content-type from environment variable
    var forbiddenContentTypes = strings.Split(os.Getenv("FORBIDDEN_CONTENT_TYPES"), ";")
    log.Println("Loaded " + strconv.Itoa(len(forbiddenContentTypes)) + " forbidden content types")
+
+   // Determinate user agent based on environment variable if any
+   var userAgent string
+   if userAgentEnvVariable := os.Getenv("USER_AGENT"); userAgentEnvVariable != "" {
+      userAgent = userAgentEnvVariable
+   } else {
+      userAgent = defaultUserAgent
+   }
 
    // create HTTP client with optimized configuration
    // disable SSL check because certificate may not be available inside container
    httpClient := &fasthttp.Client{
-      Name:         "trandoshan-io/crawler",
+      Name:         userAgent,
       Dial:         fasthttpproxy.FasthttpSocksDialer(os.Getenv("TOR_PROXY")),
       ReadTimeout:  time.Second * 5,
       WriteTimeout: time.Second * 5,
