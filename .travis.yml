@@ -4,7 +4,7 @@ go:
   - 1.13.1
 
 env:
-  - GO111MODULE=on
+  - GO111MODULE=off
 
 before_install:
   - go get -v github.com/nats-io/nats.go/
