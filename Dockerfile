@@ -1,5 +1,5 @@
 # build image
-FROM golang:1.12.7-alpine3.10 as builder
+FROM golang:1.13.1-alpine3.10 as builder
 
 RUN apk update && apk upgrade && \
     apk add --no-cache bash git openssh
