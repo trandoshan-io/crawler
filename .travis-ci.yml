@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.13.1
+
+env:
+  - GO111MODULE=on
+
+before_install:
+  - go get -v github.com/nats-io/nats.go/
+  - go get -v github.com/valyala/fasthttp
+  - go get -v golang.org/x/net/proxy
+
+script:
+  - CGO_ENABLED=0 go test -v
+  - go build -v crawler.go
