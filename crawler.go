@@ -28,7 +28,7 @@ var (
 )
 
 // Data sent to NATS with subject content
-type pageData struct {
+type resourceData struct {
 	Url     string `json:"url"`
 	Content string `json:"content"`
 }
@@ -87,16 +87,16 @@ func handleMessages(natsClient *nats.Conn, httpClient *fasthttp.Client, forbidde
 			return
 		}
 
-		// Crawl the page
-		data, urls, err := crawlPage(url, httpClient, forbiddenContentTypes)
+		// Crawl the resource
+		data, urls, err := crawlResource(url, httpClient, forbiddenContentTypes)
 		if err != nil {
 			log.Printf("Error while processing message: %s", err)
 			// todo: store in sort of DLQ?
 			return
 		}
 
-		// Put page body in content queue
-		bytes, err := json.Marshal(pageData{Url: url, Content: data})
+		// Put resource body in content queue
+		bytes, err := json.Marshal(resourceData{Url: url, Content: data})
 		if err != nil {
 			log.Printf("Error while serializing message into json: %s", err)
 			// todo: store in sort of DLQ?
@@ -122,11 +122,11 @@ func handleMessages(natsClient *nats.Conn, httpClient *fasthttp.Client, forbidde
 	}
 }
 
-// Crawl given page with given http client and return page content
+// Crawl given resource with given http client and return his content
 //
 // Function will return error if http content-type returned by remote server is contained in forbidden content type slice
-func crawlPage(url string, httpClient *fasthttp.Client, forbiddenContentTypes []string) (string, []string, error) {
-	log.Printf("Crawling page %s", url)
+func crawlResource(url string, httpClient *fasthttp.Client, forbiddenContentTypes []string) (string, []string, error) {
+	log.Printf("Crawling resource %s", url)
 
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
@@ -154,7 +154,7 @@ func crawlPage(url string, httpClient *fasthttp.Client, forbiddenContentTypes []
 		// since the url may have been crawled already
 	case statusCode == 301 || statusCode == 302:
 		log.Printf("Found HTTP redirect (code: %d)", statusCode)
-		// extract url that may be present in the page
+		// extract url that may be present in the resource (in case of HTML, ...)
 		urls := extractUrls(strings.TrimSuffix(url, "/"), resp.Body())
 		// add url present in the location header (if any)
 		if locationUrl := string(resp.Header.Peek("Location")); locationUrl != "" {
@@ -171,9 +171,9 @@ func crawlPage(url string, httpClient *fasthttp.Client, forbiddenContentTypes []
 // Function will extract both relative and absolute URLs
 // For relative url the found url will be prepend by websiteUrl parameter in order to translate them
 func extractUrls(websiteUrl string, content []byte) []string {
-	// Compile regex to extract all absolute urls in the page body
+	// Use regex to extract all absolute urls in the resource body
 	absoluteUrls := absoluteUrlRegex.FindAll(content, -1)
-	// Compile regex to extract all relative urls in the page body
+	// Use regex to extract all relative urls in the resource body
 	relativeUrls := relativeUrlRegex.FindAll(content, -1)
 
 	// Convert each bytes element into their string representation
