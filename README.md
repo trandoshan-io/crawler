@@ -1,6 +1,7 @@
 # crawler
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/trandoshan-io/crawler)](https://goreportcard.com/report/github.com/trandoshan-io/crawler)
+[![Build Status](https://travis-ci.org/trandoshan-io/crawler.svg?branch=master)](https://travis-ci.org/trandoshan-io/crawler)
 
 Crawler is a Go written program designed to crawl website
 
