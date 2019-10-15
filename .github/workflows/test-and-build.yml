@@ -21,3 +21,6 @@ jobs:
 
     - name: Build
       run: go build -v .
+
+    - name: Update go report card
+      uses: creekorful/goreportcard-action@v0.1
