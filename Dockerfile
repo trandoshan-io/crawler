@@ -9,7 +9,7 @@ WORKDIR /app
 
 # Test then build app
 RUN CGO_ENABLED=0 go test -v
-RUN go build -v crawler.go
+RUN go build -v
 
 
 # runtime image
